@@ -1,0 +1,173 @@
+{
+  "project_name": "Idle Maker",
+  "theme": "Light",
+  "archetype": "1 (Organic & Earthy) - Sketchbook Variant",
+  "design_philosophy": "A creator's sketchbook for weird little games. Cozy, draft-y, playful, handmade. Avoid corporate or Fisher-Price looks.",
+  "colors": {
+    "background": {
+      "paper": "#F8F1DF",
+      "card": "#FFF9EA",
+      "sticky_note": "#FEF7D2",
+      "modal_overlay": "rgba(47, 42, 36, 0.4)"
+    },
+    "text": {
+      "primary": "#2F2A24",
+      "secondary": "#8A7D6B",
+      "accent": "#5DADEC",
+      "code": "#2F2A24"
+    },
+    "accents": {
+      "blue": "#5DADEC",
+      "green": "#79B86D",
+      "gold": "#F2B84B",
+      "red": "#E97865",
+      "lavender": "#A98BD8"
+    },
+    "borders": {
+      "soft": "#D8C8A8",
+      "ink": "#2F2A24",
+      "pencil": "#8A7D6B"
+    }
+  },
+  "typography": {
+    "headings": {
+      "font": "Fraunces",
+      "weights": ["400", "600", "700"],
+      "usage": "Hero and display headings. Gives a slightly old-school print feel."
+    },
+    "body": {
+      "font": "Nunito",
+      "weights": ["400", "600"],
+      "usage": "Main UI, body text, buttons."
+    },
+    "mono": {
+      "font": "JetBrains Mono",
+      "weights": ["400", "500", "700"],
+      "usage": "Numbers, JSON previews, economy values, configs."
+    },
+    "handwriting": {
+      "font": "Caveat",
+      "weights": ["400", "700"],
+      "usage": "Sparingly for sketchbook labels, sticky notes, doodle captions."
+    },
+    "scale": {
+      "h1": "text-4xl md:text-5xl lg:text-6xl tracking-tight leading-none font-fraunces text-[#2F2A24]",
+      "h2": "text-2xl md:text-3xl lg:text-4xl tracking-tight font-fraunces text-[#2F2A24]",
+      "h3": "text-xl md:text-2xl font-fraunces text-[#2F2A24]",
+      "body": "text-base font-nunito text-[#2F2A24]",
+      "small": "text-sm font-nunito text-[#8A7D6B]",
+      "tiny": "text-xs uppercase tracking-[0.2em] font-nunito text-[#8A7D6B]"
+    }
+  },
+  "spacing_and_layout": {
+    "philosophy": "Generous, organic spacing. Elements should feel placed rather than rigidly snapped, using generous padding and slight rotations.",
+    "scale": "p-4, p-6, p-8, p-12. Avoid tight, dense groupings unless it's a code block.",
+    "structure": {
+      "main_canvas": "Notebook style. Use a repeating radial-gradient for a subtle dot-grid paper texture background over #F8F1DF.",
+      "navigation": "Notebook tabs at the top of the canvas, distinct from standard web nav.",
+      "sidebar": "Project Tray on the left. Style it like the edge of a folder with paper-clipped assets.",
+      "drawer": "Mod-Mate AI Companion slides in from the right. Style it like a spiral notepad or a clipboard."
+    }
+  },
+  "surfaces_and_textures": {
+    "background_texture": "A faint dot-grid pattern. Example Tailwind class strategy: bg-[radial-gradient(#D8C8A8_1px,transparent_1px)] bg-[size:20px_20px]",
+    "shadows": {
+      "pencil_soft": "shadow-[4px_4px_0px_0px_rgba(138,125,107,0.3)]",
+      "ink_hard": "shadow-[4px_4px_0px_0px_rgba(47,42,36,1)]"
+    },
+    "borders": {
+      "wobbly": "Use rounded-[255px_15px_225px_15px/15px_225px_15px_255px] to simulate hand-drawn boxes rather than perfect rectangles."
+    }
+  },
+  "components": {
+    "PaperCard": {
+      "base": "bg-[#FFF9EA] border-2 border-[#D8C8A8] p-6 relative transition-transform rounded-[255px_15px_225px_15px/15px_225px_15px_255px]",
+      "interaction": "hover:-translate-y-1 hover:shadow-[4px_4px_0px_0px_rgba(138,125,107,0.3)] hover:border-[#8A7D6B]",
+      "notes": "Apply a slight rotation (rotate-1 or -rotate-1) randomly on some cards to enhance the draft-y feel."
+    },
+    "StickerTag": {
+      "base": "inline-flex items-center px-3 py-1 bg-white border-2 border-[#2F2A24] rounded-full text-sm font-bold font-nunito text-[#2F2A24] transition-all",
+      "interaction": "hover:scale-105 hover:rotate-2 shadow-[2px_2px_0px_0px_rgba(47,42,36,1)]",
+      "notes": "Looks like a die-cut sticker. Use vibrant accent colors for the background on hover."
+    },
+    "NotebookTab": {
+      "base": "px-6 py-2 rounded-t-lg border-2 border-b-0 border-[#D8C8A8] bg-[#F8F1DF] text-[#8A7D6B] font-fraunces font-bold transition-colors cursor-pointer",
+      "active": "bg-[#FFF9EA] border-[#2F2A24] text-[#2F2A24] shadow-[0px_-4px_0px_0px_rgba(169,139,216,0.3)] translate-y-[2px]"
+    },
+    "StickyNote": {
+      "base": "bg-[#FEF7D2] border border-[#F2B84B]/40 p-4 shadow-sm rotate-2 relative max-w-sm",
+      "typography": "font-caveat text-xl text-[#2F2A24]",
+      "decoration": "Add a pseudo-element or absolute div at the top center for 'washi tape': bg-[#5DADEC]/50 w-12 h-4 -mt-6 -rotate-2"
+    },
+    "CompanionMessage": {
+      "base": "bg-white border-2 border-[#2F2A24] p-4 rounded-xl shadow-[4px_4px_0px_0px_rgba(47,42,36,1)] mb-4 font-nunito",
+      "ai_header": "flex items-center gap-2 font-fraunces text-sm text-[#A98BD8] mb-2"
+    },
+    "ImportDropzone": {
+      "base": "border-4 border-dashed border-[#D8C8A8] bg-[#F8F1DF]/50 rounded-2xl p-12 text-center hover:bg-[#FFF9EA] hover:border-[#5DADEC] transition-colors",
+      "typography": "font-fraunces text-[#8A7D6B]"
+    },
+    "ExportFolderCard": {
+      "base": "bg-[#F2B84B] border-2 border-[#2F2A24] rounded-t-sm rounded-b-xl p-8 relative shadow-[6px_6px_0px_0px_rgba(47,42,36,1)]",
+      "tab": "absolute -top-4 left-0 bg-[#F2B84B] border-2 border-b-0 border-[#2F2A24] px-4 py-2 rounded-t-lg"
+    }
+  },
+  "custom_cursor": {
+    "concept": "Sketchbook Tools",
+    "default": "A small, tilted graphite pencil SVG. Pointing top-left.",
+    "hover_interactive": "A hand-drawn raccoon paw (for buttons/links) to fit the sample game lore, or a thicker marker.",
+    "drag": "A closed raccoon paw holding the object.",
+    "technical_implementation": "Hide default cursor via CSS `cursor: none`. Render a fixed-position div following mouse coordinates using framer-motion or standard event listeners. Ensure `pointer-events: none` on the custom cursor."
+  },
+  "motion": {
+    "philosophy": "Tactile and snappy, like moving physical cards.",
+    "transitions": "transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)",
+    "hover": "Scale 1.02, rotate slightly, increase offset shadow.",
+    "entry": "Slight stagger upward fade-in for lists (like laying down cards one by one)."
+  },
+  "section_layouts": {
+    "Landing": "Hero text centered, large Fraunces font. A stack of slightly rotated PaperCards representing projects. Warm, inviting.",
+    "Idea_Page": "A blank canvas with dot-grid. Large StickyNotes and text inputs using Caveat for labels, Nunito for input. Looks like a brainstorming wall.",
+    "Loop_Sketch": "Canvas for a flowchart. Nodes are StickerTags or PaperCards, connected by rough SVG dashed lines with hand-drawn arrows.",
+    "Economy_Notes": "Split view. Left: Generators (lists). Right: Currencies. Use JetBrains Mono for the math and JSON-like configuration. High density.",
+    "Upgrade_Stickers": "A loose grid of StickerTags. Visually dense. Some stickers are 'peeling' (hover effect).",
+    "Creature_Doodles": "Gallery of mascot images and enemy concepts. Cards look like polaroids or index cards clipped to a board.",
+    "Asset_Kit": "Folder UI. Grid of images. Incorporate washi tape graphics across the corners of the images.",
+    "Prototype_Playground": "A 'phone-sized' or embedded window card in the center with a mock clicker interface. Surrounded by floating stats in JetBrains Mono.",
+    "Export_Folder": "A manila folder graphic. Big, chunky 'Pack Kit' button with green (Moss Green) accents."
+  },
+  "icons_and_doodles": {
+    "library": "lucide-react",
+    "styling": "Use thin stroke-width=1.5 to simulate pencil or ink drawings.",
+    "accents": "Include inline SVG sketchy doodles (asterisks, dashed underlines, and swirly arrows) as decorative absolute-positioned elements around headings."
+  },
+  "testing": {
+    "rules": "All interactive elements MUST include a `data-testid` attribute in kebab-case format."
+  },
+  "media": {
+    "raccoon_mascot": {
+      "url": "https://static.prod-images.emergentagent.com/jobs/a33bcda4-5769-4b18-87d6-b5099b590c3a/images/a393829da4aab424870d9cedd5106d7b3ae0e14ca908fbe1b0289eae47338497.png",
+      "description": "Hand-drawn sketchbook style concept art of a cursed muffin raccoon character",
+      "usage": "Use in Creature Doodles or Asset Kit"
+    },
+    "bakery_environment": {
+      "url": "https://static.prod-images.emergentagent.com/jobs/a33bcda4-5769-4b18-87d6-b5099b590c3a/images/443ccaf3988cd56cbf97ccddf12a0b037ebfadb7ba5a4f835021394f2fbfd4fa.png",
+      "description": "Hand-drawn isometric sketch of a magical raccoon bakery",
+      "usage": "Use as a background element or hero image in the Asset Kit/Prototype"
+    },
+    "doodle_assets": {
+      "url": "https://static.prod-images.emergentagent.com/jobs/a33bcda4-5769-4b18-87d6-b5099b590c3a/images/2371b7d999e4d13108c8746ca782860e3b9f0b3c2ec51030182feddc11523812.png",
+      "description": "Sheet of sketchy, hand-drawn UI elements and doodles on warm paper",
+      "usage": "Use for extracting visual accents, or display in Asset Kit"
+    }
+  },
+  "instructions_to_main_agent": [
+    "Follow the typography stack strictly. Never use Inter or generic sans for headings. Use Fraunces for headings, Nunito for body, JetBrains Mono for stats/code, and Caveat ONLY for tiny accents/labels.",
+    "Do not use Shadcn default looks as-is. Customize components to have wobbly borders (using complex border-radius) and hard pencil/ink shadows instead of soft diffuse shadows.",
+    "Include a global custom cursor component using the specifications provided, tracking the mouse pointer and rendering an SVG pencil/paw.",
+    "Ensure the background uses a very faint dot-grid texture overlaying the paper color.",
+    "Use standard HTML/Tailwind for the creative layouts rather than rigid Vercel-like cards.",
+    "Add 'data-testid' to everything interactive to ensure testability.",
+    "Do NOT make the UI look like a children's app. Keep it looking like a professional but eccentric creator's notebook."
+  ]
+}
