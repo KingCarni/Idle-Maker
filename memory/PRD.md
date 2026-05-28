@@ -36,15 +36,23 @@ NO production exporters. Sample mock game: **Cursed Muffin Raccoons**.
 - ✅ **Economy Notes** with currency cards + JetBrains Mono generator table
 - ✅ **Upgrade Stickers** with peel-styled sticker cards + systems toggles
 - ✅ **Creature Doodles** as index-card gallery (pets/enemies/bosses)
-- ✅ **Asset Kit** with 10 placeholder slots (3 prefilled with mock images) + imports gallery
+- ✅ **Asset Kit** with 10 placeholder slots + imports gallery
+- ✅ **REAL AI image generation** via Gemini Nano Banana (`gemini-3.1-flash-image-preview`) wired into the Asset Kit:
+  - Backend `POST /api/assets/generate` accepts `{slotId, label, prompt, conceptTitle?, conceptTheme?, conceptTone?}` and returns `{image: data-URL, mime, model, slotId}`
+  - Per-slot style guidance (`SLOT_STYLE`) + universal sketchbook style suffix keeps aesthetic consistent
+  - Frontend shows loading overlay → image with "Nano Banana" sticker badge → re-sketch / edit prompt / clear actions
+  - Generated images persist in AppContext across tab switches
+  - Uses Emergent LLM Key (no user-supplied API key required)
 - ✅ **Prototype Playground** — clickable oven, idle ticks, geometric-cost raccoon buy, 5 upgrades with real effects, prestige reset, pacing notes
 - ✅ **Export Folder** — 7 manila-folder cards with status badges + Pack Kit summary
 - ✅ Sketchbook UI primitives: PaperCard, StickerTag, StickyNote, NotebookTabs, doodles (SketchArrow/Star/Asterisk/Scribble/Underline)
 - ✅ Custom Tailwind theme: paper/card/sticky/ink/pencil + 5 accent colors, wobble border radius, pencil + ink box shadows, washi-tape decorator, dot-grid background
-- ✅ Backend `/api/health` + `/api/mock-data` endpoints (legacy `/api/status` retained)
+- ✅ Backend `/api/health` + `/api/mock-data` + `/api/assets/generate` (legacy `/api/status` retained)
 - ✅ data-testid coverage on every interactive element
 - ✅ Production build passes (`yarn build` clean)
-- ✅ Test report iteration_1: backend 8/8 pytest, frontend 100% on isolated re-test, no bugs
+- ✅ Test reports:
+  - iteration_1 — backend 8/8, frontend 100% (initial MVP)
+  - iteration_2 — backend 11/11 (+3 asset-gen tests), frontend 100% (Nano Banana feature)
 
 ## Backlog / Next Phase (P0 → P2)
 P0 — Real systems
@@ -57,9 +65,10 @@ P1 — Production polish
 - Real JSON Config exporter (download a single config.json)
 - Browser Prototype export (HTML + JS bundle)
 - Markdown design-doc export
-- Asset Pack zip (group imported + generated assets)
-- AI image generation for asset slots (Gemini Nano Banana)
+- Asset Pack zip (group imported + generated assets, including Nano Banana outputs)
 - Drag-to-rearrange loop nodes; auto-routed arrows
+- Persist edited prompts per slot across tab switches (lift `prompts` into AppContext)
+- Add a single in-server retry for transient Nano Banana empty-image responses
 
 P2 — Studio extras
 - Godot / Unity starter project export scaffolds
