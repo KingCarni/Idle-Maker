@@ -43,6 +43,12 @@ interface AppState {
   pgRaccoons: number;
   pgPerSec: number;
   ownedUpgrades: string[];
+  // Generated asset slot images, keyed by slotId
+  assets: Record<string, string>;
+  // slotIds currently generating
+  generating: Record<string, boolean>;
+  // last-error per slot for friendly UI feedback
+  assetErrors: Record<string, string>;
 }
 
 type Action =
@@ -57,7 +63,11 @@ type Action =
   | { type: 'buyRaccoon' }
   | { type: 'buyUpgrade'; id: string }
   | { type: 'prestige' }
-  | { type: 'tick' };
+  | { type: 'tick' }
+  | { type: 'assetStart'; slotId: string }
+  | { type: 'assetDone'; slotId: string; image: string }
+  | { type: 'assetError'; slotId: string; error: string }
+  | { type: 'assetClear'; slotId: string };
 
 function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
@@ -124,6 +134,34 @@ function reducer(state: AppState, action: Action): AppState {
         ...state,
         pgCrumbs: state.pgCrumbs + state.pgPerSec / 5, // 200ms tick
       };
+    case 'assetStart':
+      return {
+        ...state,
+        generating: { ...state.generating, [action.slotId]: true },
+        assetErrors: { ...state.assetErrors, [action.slotId]: '' },
+      };
+    case 'assetDone': {
+      const { [action.slotId]: _gone, ...restGen } = state.generating;
+      return {
+        ...state,
+        generating: restGen,
+        assets: { ...state.assets, [action.slotId]: action.image },
+        assetErrors: { ...state.assetErrors, [action.slotId]: '' },
+      };
+    }
+    case 'assetError': {
+      const { [action.slotId]: _gone, ...restGen } = state.generating;
+      return {
+        ...state,
+        generating: restGen,
+        assetErrors: { ...state.assetErrors, [action.slotId]: action.error },
+      };
+    }
+    case 'assetClear': {
+      const { [action.slotId]: _gone, ...restAssets } = state.assets;
+      const { [action.slotId]: _err, ...restErr } = state.assetErrors;
+      return { ...state, assets: restAssets, assetErrors: restErr };
+    }
     default:
       return state;
   }
@@ -143,6 +181,9 @@ const initial: AppState = {
   pgRaccoons: 0,
   pgPerSec: 0,
   ownedUpgrades: [],
+  assets: {},
+  generating: {},
+  assetErrors: {},
 };
 
 interface AppContextValue extends AppState {
@@ -160,6 +201,8 @@ interface AppContextValue extends AppState {
   raccoonCost: () => number;
   next: () => void;
   prev: () => void;
+  generateAsset: (slotId: string, label: string, prompt: string) => Promise<void>;
+  clearAsset: (slotId: string) => void;
 }
 
 const Ctx = createContext<AppContextValue | null>(null);
@@ -195,6 +238,49 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (i > 0) dispatch({ type: 'setTab', tab: TAB_KEYS[i - 1] });
   }, [state.activeTab]);
 
+  const generateAsset = useCallback(
+    async (slotId: string, label: string, prompt: string) => {
+      dispatch({ type: 'assetStart', slotId });
+      try {
+        const base =
+          process.env.NEXT_PUBLIC_BACKEND_URL ||
+          (process.env.REACT_APP_BACKEND_URL as string) ||
+          '';
+        const res = await fetch(`${base}/api/assets/generate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            slotId,
+            label,
+            prompt,
+            conceptTitle: state.concept.title,
+            conceptTheme: state.concept.theme,
+            conceptTone: state.concept.tone,
+          }),
+        });
+        if (!res.ok) {
+          const detail = await res.text();
+          throw new Error(detail.slice(0, 200) || `HTTP ${res.status}`);
+        }
+        const data = (await res.json()) as { image: string };
+        if (!data.image) throw new Error('Empty response');
+        dispatch({ type: 'assetDone', slotId, image: data.image });
+      } catch (e: any) {
+        dispatch({
+          type: 'assetError',
+          slotId,
+          error: e?.message || 'Generation failed',
+        });
+      }
+    },
+    [state.concept.title, state.concept.theme, state.concept.tone]
+  );
+
+  const clearAsset = useCallback(
+    (slotId: string) => dispatch({ type: 'assetClear', slotId }),
+    []
+  );
+
   const value = useMemo<AppContextValue>(
     () => ({
       ...state,
@@ -212,8 +298,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       raccoonCost,
       next,
       prev,
+      generateAsset,
+      clearAsset,
     }),
-    [state, setTab, updateConcept, toggleSystem, addImport, removeImport, addMessage, setCompanionOpen, tap, buyRaccoon, buyUpgrade, prestige, raccoonCost, next, prev]
+    [state, setTab, updateConcept, toggleSystem, addImport, removeImport, addMessage, setCompanionOpen, tap, buyRaccoon, buyUpgrade, prestige, raccoonCost, next, prev, generateAsset, clearAsset]
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

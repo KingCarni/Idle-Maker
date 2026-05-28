@@ -1,0 +1,38 @@
+{
+  "summary": "Iteration 2: tested new Nano Banana asset-generation feature plus regression on the rest of the Idle Maker backend. Backend pytest 11/11 passing (2 new asset-generation tests + validation + previous 8 regression tests). Frontend Asset Kit fully verified: 10 slots render, pet-2 generate flow shows loading overlay, then a data:image/...;base64,... <img> + 'Nano Banana' badge + clear button; re-sketch triggers second loading cycle; assets persist across tab switches (Assets→Landing→Assets shows image still there); prompt-edit toggles the textarea and the edited prompt is sent in the network request body. No critical bugs.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Asset Kit", "issues": ["Per-slot edited prompts (component-local React state inside AssetKit) are lost when user switches tabs and returns, because AppShell only renders the active section. The generated images themselves DO persist (they live in AppContext). Not a regression vs the spec (spec only required assets to survive tab switch), but worth lifting `prompts` into AppContext if prompt persistence is desired."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_idle_maker_api.py",
+    "/app/backend/tests/test_assets_generate.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py generate_asset: good defensive handling — checks EMERGENT_LLM_KEY, lazy-imports emergentintegrations, only logs first 10 chars of base64 (per spec), uses 502 for upstream model failures and 500 for misconfiguration. Clean.",
+    "server.py _build_prompt: gracefully handles empty prompt by falling back on SLOT_STYLE hint — verified working (test_generate_with_empty_prompt_uses_fallback).",
+    "AppContext.generateAsset: reads NEXT_PUBLIC_BACKEND_URL first then falls back to REACT_APP_BACKEND_URL — both env vars are set to the same value in /app/frontend/.env so this is robust.",
+    "AssetKit local `prompts` and `editing` state survive only while the section is mounted. If product wants edited prompts to survive tab switches, lift into AppContext reducer (similar to assets/generating/assetErrors).",
+    "Backend route uses model_id='gemini-3.1-flash-image-preview' which is the documented Nano Banana model; verified live calls return real PNG base64 in ~10-25s.",
+    "No retry/backoff inside the backend on transient 502s from the model — the frontend treats errors as one-shot. The pytest suite intentionally allows one retry per call to absorb transient failures, but production users would just see the error and have to click again. Consider a single in-server retry on empty-image responses."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_assets_generate.py"
+  ],
+  "success_rate": {"backend": "100% (11/11 incl. 3 new asset-gen tests)", "frontend": "100% on Asset Kit feature spec (10 slots, generate, loading, image, Nano Banana badge, clear, re-sketch, edit-prompt, tab-switch persistence)"},
+  "test_credentials": "none (no auth)",
+  "seed_data_creation": "Two real Nano Banana image generations executed during backend tests (slot=mascot, slot=moodboard) — these only return inline data URLs and are not persisted server-side, so nothing to clean up. The frontend Playwright run also triggered 2-3 real generations (pet-2 twice, pet-1 once) — also ephemeral.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend regression suite at /app/backend/tests/test_idle_maker_api.py + /app/backend/tests/test_assets_generate.py — run with `pytest /app/backend/tests/ -v`. Tests now load /app/frontend/.env via python-dotenv so REACT_APP_BACKEND_URL is picked up. Each asset-generate test uses a 75s timeout and allows one retry on transient upstream 502. For frontend, do NOT chain tab-switches before a generate — the per-slot prompt textarea is component-local state and resets on tab switch (this is expected, not a bug). Use ONE real generation per Playwright run to keep things fast (each call takes 10-25s). EMERGENT_LLM_KEY in /app/backend/.env is configured. /api/assets/generate returns {image, mime, model, slotId} where image is a `data:image/png;base64,...` URL.",
+  "rca_of_issues": "None. Initial Playwright run reported a false-positive 'edited prompt not sent' because the test interleaved a tab switch between fill() and click(generate); the local React `prompts` state in AssetKit resets on unmount. Re-running in isolation (no tab switch) confirmed the edited prompt 'A grumpy hedgehog pet wielding a wooden spoon' IS sent in the POST body to /api/assets/generate. This matches the spec, which only requires `assets` (the generated images stored in AppContext) to survive tab switches — and they do."
+}
