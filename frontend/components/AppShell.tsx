@@ -120,11 +120,7 @@ function TopBar() {
             </span>
           </span>
         </a>
-        <div className="hidden md:flex items-center gap-3 font-nunito text-sm text-pencil">
-          <SaveStatus />
-        </div>
-        {/* compact save status on small screens */}
-        <div className="md:hidden">
+        <div className="flex items-center gap-3 font-nunito text-sm text-pencil">
           <SaveStatus />
         </div>
       </div>

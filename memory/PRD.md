@@ -27,52 +27,48 @@ NO production exporters. Sample mock game: **Cursed Muffin Raccoons**.
 ## What's implemented (2026-01)
 - ✅ App shell with topbar, notebook tabs, content pane, footer prev/next
 - ✅ All 9 sections: Landing, Idea, Loop, Economy, Upgrades, Creatures, Assets, Playground, Export
-- ✅ Persistent **Project Tray** with current-game summary + import dropzone
+- ✅ Persistent **Project Tray** with current-game summary, project count chip, + import dropzone
 - ✅ **Mod-Mate Companion** drawer with seed messages, canned replies, free-text input, 6 quick-prompt buttons, spiral-notebook header
 - ✅ **Custom cursor** with mode-aware variants (pencil / paw / ink nib) + trailing ink dot
-- ✅ Client-side **Import Dropzone** for JSON/MD/PNG/JPG/JPEG/WEBP/SVG with previews (JSON pretty-printed, MD plaintext, image thumbnails) and friendly sketchbook warning for invalid files
-- ✅ **Idea page** concept builder: dropdowns, chip groups, sticker-tag system toggles, free-text
-- ✅ **Loop Sketch** with hand-positioned nodes + animated dashed SVG arrows
-- ✅ **Economy Notes** with currency cards + JetBrains Mono generator table
-- ✅ **Upgrade Stickers** with peel-styled sticker cards + systems toggles
-- ✅ **Creature Doodles** as index-card gallery (pets/enemies/bosses)
-- ✅ **Asset Kit** with 10 placeholder slots + imports gallery
-- ✅ **REAL AI image generation** via Gemini Nano Banana (`gemini-3.1-flash-image-preview`) wired into the Asset Kit:
-  - Backend `POST /api/assets/generate` accepts `{slotId, label, prompt, conceptTitle?, conceptTheme?, conceptTone?}` and returns `{image: data-URL, mime, model, slotId}`
-  - Per-slot style guidance (`SLOT_STYLE`) + universal sketchbook style suffix keeps aesthetic consistent
-  - Frontend shows loading overlay → image with "Nano Banana" sticker badge → re-sketch / edit prompt / clear actions
-  - Generated images persist in AppContext across tab switches
-  - Uses Emergent LLM Key (no user-supplied API key required)
-- ✅ **Prototype Playground** — clickable oven, idle ticks, geometric-cost raccoon buy, 5 upgrades with real effects, prestige reset, pacing notes
-- ✅ **Export Folder** — 7 manila-folder cards with status badges + Pack Kit summary
-- ✅ Sketchbook UI primitives: PaperCard, StickerTag, StickyNote, NotebookTabs, doodles (SketchArrow/Star/Asterisk/Scribble/Underline)
-- ✅ Custom Tailwind theme: paper/card/sticky/ink/pencil + 5 accent colors, wobble border radius, pencil + ink box shadows, washi-tape decorator, dot-grid background
-- ✅ Backend `/api/health` + `/api/mock-data` + `/api/assets/generate` (legacy `/api/status` retained)
-- ✅ data-testid coverage on every interactive element
+- ✅ Client-side **Import Dropzone** for JSON/MD/PNG/JPG/JPEG/WEBP/SVG with previews and friendly sketchbook warning
+- ✅ **Idea page** concept builder
+- ✅ **Loop Sketch**, **Economy Notes**, **Upgrade Stickers**, **Creature Doodles**, **Asset Kit**, **Prototype Playground**, **Export Folder**
+- ✅ **Real Nano Banana image generation** wired into Asset Kit (Emergent LLM key, `gemini-3.1-flash-image-preview`)
+- ✅ **MongoDB-backed multi-project persistence**:
+  - Backend: `Project` / `GameConcept` / `PlaygroundState` Pydantic models + CRUD endpoints (`GET/POST/PUT/DELETE /api/projects`, `POST /api/projects/{id}/duplicate`)
+  - Idempotent **startup seed** of "Cursed Muffin Raccoons" when the collection is empty; **reseed on delete-everything** so the workspace is never empty
+  - Project summaries include `systemsCount` / `assetsCount` / timestamps for fast list rendering
+  - PUT supports partial updates (title, concept, playground, assets) with timestamp bump
+- ✅ Frontend persistence UX:
+  - Topbar **project chip** + **save-state pill** (idle / dirty / saving / saved / error) + manual **Save** button
+  - **Auto-save**: 800ms debounce after any concept/system/playground/asset change
+  - **Dedicated ProjectModal** with search, "New project" inline form, per-card Open / Duplicate / Delete-with-confirm
+  - Bootstrap on app load: fetch `/api/projects` → auto-open most recently updated
+  - Per-project state lives in AppContext; loadProject swaps concept + playground + assets atomically without flagging dirty
+- ✅ Sketchbook UI primitives, custom Tailwind theme, full data-testid coverage
 - ✅ Production build passes (`yarn build` clean)
 - ✅ Test reports:
   - iteration_1 — backend 8/8, frontend 100% (initial MVP)
-  - iteration_2 — backend 11/11 (+3 asset-gen tests), frontend 100% (Nano Banana feature)
+  - iteration_2 — backend 11/11 (+3 asset-gen tests), frontend 100% (Nano Banana)
+  - iteration_3 — backend 20/20 (+12 project tests), frontend 100% (project persistence)
 
 ## Backlog / Next Phase (P0 → P2)
 P0 — Real systems
 - Wire **real Mod-Mate** via Emergent LLM key (Claude/GPT/Gemini) with streaming
-- Persist projects (currently single in-memory concept) — MongoDB models for projects, generators, upgrades
-- Save / load / list multiple game projects
-- Sharable read-only project links
+- Sharable read-only project links (URL-shareable snapshots)
 
 P1 — Production polish
-- Real JSON Config exporter (download a single config.json)
+- Real JSON Config exporter (download a single config.json — schema already lives in `Project` model)
 - Browser Prototype export (HTML + JS bundle)
 - Markdown design-doc export
-- Asset Pack zip (group imported + generated assets, including Nano Banana outputs)
+- Asset Pack zip (bundle generated Nano Banana outputs + imports)
 - Drag-to-rearrange loop nodes; auto-routed arrows
-- Persist edited prompts per slot across tab switches (lift `prompts` into AppContext)
-- Add a single in-server retry for transient Nano Banana empty-image responses
+- Persist edited Asset-Kit slot prompts (currently session-local; lift into Project)
+- Persist imported files into the project (currently session-local — would need GridFS or object-storage for blobs)
 
 P2 — Studio extras
 - Godot / Unity starter project export scaffolds
-- Idle game balancing simulator (run N minutes, plot curves)
+- Idle balancing simulator (run-N-minutes preview with curve plots)
 - Multiplayer sketchbook (shared notebook page)
 - Mobile sketchbook view
 
