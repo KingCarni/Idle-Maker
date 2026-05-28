@@ -18,6 +18,8 @@ import AssetKit from './sections/AssetKit';
 import PrototypePlayground from './sections/PrototypePlayground';
 import ExportFolder from './sections/ExportFolder';
 import { SketchStar } from './doodles';
+import ProjectModal from './ProjectModal';
+import SaveStatus from './SaveStatus';
 
 export default function AppShell() {
   const { activeTab, setTab, next, prev } = useApp();
@@ -71,6 +73,7 @@ export default function AppShell() {
         </main>
       </div>
       <CompanionPanel />
+      <ProjectModal />
     </div>
   );
 }
@@ -118,10 +121,11 @@ function TopBar() {
           </span>
         </a>
         <div className="hidden md:flex items-center gap-3 font-nunito text-sm text-pencil">
-          <span className="px-2 py-1 rounded-full bg-card border border-softBorder">
-            mock data · local state
-          </span>
-          <span className="font-mono text-xs">build / preview</span>
+          <SaveStatus />
+        </div>
+        {/* compact save status on small screens */}
+        <div className="md:hidden">
+          <SaveStatus />
         </div>
       </div>
     </header>

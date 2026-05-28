@@ -1,0 +1,42 @@
+{
+  "summary": "Iteration 3: MongoDB-backed multi-project persistence. Backend 12/12 new project tests + 8/8 regression tests = 20/20 passing in 2s. All required endpoints (list, get, create, update, delete, duplicate) validated incl. round-trip persistence for concept (systems toggle), title (also updates concept.title), playground (pgRaccoons=3, pgPerSec=3.6), and assets ({'mascot':'data:image/png;base64,XXXX'}). Default seed 'Cursed Muffin Raccoons' present on first launch and successfully reseeded after deleting every project from the UI. Frontend: bootstrap chip shows seed + 'saved' within 2s, project modal open/search/new/open/duplicate/delete-with-confirm all wired correctly, auto-save fires <2s after a title edit transitioning unsaved→saved, page reload persists the new title, manual Save button triggers exactly one PUT /api/projects/{id}, switching between two projects preserves per-project systems state. /api/assets/generate skipped this iteration (covered fully in iteration 2; no related code changes).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "AppShell topbar", "issue": "SaveStatus is rendered twice in the DOM (once for md:flex desktop, once for md:hidden mobile) so every data-testid it owns appears twice: save-now (2), current-project-title (2), save-state (2), open-project-modal (2). Functionality is fine (only one is visually shown via Tailwind responsive classes), but Playwright strict locators throw without .first/.nth(). Recommend conditionally rendering one based on viewport or wrapping the two with mutually exclusive variants of the testids (e.g., save-now-desktop / save-now-mobile).", "selector": "[data-testid=save-now]", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_projects_api.py",
+    "/app/backend/tests/test_idle_maker_api.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "(Optional, LOW) De-duplicate data-testid in SaveStatus by rendering only one of the two SaveStatus instances or by giving the mobile variant distinct testids (save-now-mobile, etc.) so external tests can use strict locators."
+  ],
+  "critical_code_review_comments": [
+    "server.py _seed_default_project + reseed-on-empty pattern is correct. Confirmed empirically: deleting every project causes a fresh 'Cursed Muffin Raccoons' to appear on next list call.",
+    "AppContext bootstrap useEffect uses a bootstrapped ref guard — good. openProject depends on its memoized callback. Works in React 18 strict-mode dev double-invoke.",
+    "AppContext auto-save useEffect: 800ms debounce keyed on (saveState, projectId). dirty() helper correctly suppresses dirty during loadingProject. 'tick' is intentionally not marked dirty (would spam saves) — matches spec.",
+    "PUT /projects/{id} accepts partial updates (title-only, concept-only, playground-only, assets-only) and merges via _deserialize_project — verified each in isolation.",
+    "Summary payload correctly derives systemsCount/assetsCount from full project — verified after assets PUT (assetsCount=1) and systems update (systemsCount=2).",
+    "Duplicate endpoint preserves concept/playground/assets snapshot and original is untouched — verified.",
+    "Frontend ProjectModal: search filter, new-project create (closes modal + switches topbar title), per-row open/duplicate/delete-with-confirm all working as specified.",
+    "MINOR (LOW): SaveStatus duplicate-mount in AppShell.tsx lines 124/128 causes all its testids to appear twice in the DOM. Functional behavior fine but slightly leaky for SDET strict locators."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_projects_api.py"
+  ],
+  "success_rate": {"backend": "100% (20/20)", "frontend": "100% on all listed flows (bootstrap, modal CRUD, auto-save, manual save, reload persistence, project switching, delete reseed)"},
+  "test_credentials": "none (no auth)",
+  "seed_data_creation": "Test ran the full delete-everything loop in the UI, which triggered backend reseed of 'Cursed Muffin Raccoons'. Workspace ended with exactly one project — the default seed — as requested by the spec.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend regression: pytest /app/backend/tests/ -v runs 20 tests in ~2s, covers projects CRUD + seed + reseed + status + mock-data + health. Asset-generation suite (/app/backend/tests/test_assets_generate.py) intentionally NOT re-run this iteration (slow ~25s each, no related code change). Frontend: SaveStatus is double-mounted in AppShell for responsive design — when writing Playwright, use .first or .nth(0) on save-now / save-state / current-project-title / open-project-modal. Bootstrap takes ~1-2s after page load (network round-trip to GET /api/projects then GET /api/projects/{first}). Auto-save debounce is 800ms; allow ~1.5-2.5s after a change before asserting saveState='saved'. Default seed re-creates when collection becomes empty on next GET — UI's deleteProject then triggers refreshProjects which re-fetches the reseeded list, so the user lands on the seed automatically.",
+  "rca_of_issues": "No bugs found in the project persistence feature. The duplicate-data-testid concern is design-by-responsive: AppShell renders one SaveStatus in a md:flex wrapper and another in a md:hidden wrapper so that the layout flows correctly on mobile vs desktop, but Tailwind responsive utilities only hide via CSS — both instances still exist in the DOM. Recommended fix is to either render conditionally via a useMediaQuery hook or to suffix the testids on one of the two instances."
+}

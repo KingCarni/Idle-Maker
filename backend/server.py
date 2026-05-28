@@ -44,6 +44,146 @@ class StatusCheck(BaseModel):
 class StatusCheckCreate(BaseModel):
     client_name: str
 
+
+# ---- Project persistence models ----
+
+# Concept (matches the frontend GameConcept type)
+class GameConcept(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    title: str = "Untitled Sketch"
+    theme: str = "Cozy Bakery"
+    gameType: str = "Cozy idle"
+    coreFantasy: str = "Watch a tiny world grow without you"
+    mainAction: str = "Tap"
+    progressionStyle: str = "Linear"
+    currencyModel: str = "Single"
+    systems: List[str] = Field(default_factory=list)
+    tone: str = "Cozy"
+    freeText: str = ""
+
+
+class PlaygroundState(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    pgCrumbs: float = 0.0
+    pgRaccoons: int = 0
+    pgPerSec: float = 0.0
+    ownedUpgrades: List[str] = Field(default_factory=list)
+
+
+class Project(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    title: str = "Untitled Sketch"
+    concept: GameConcept = Field(default_factory=GameConcept)
+    playground: PlaygroundState = Field(default_factory=PlaygroundState)
+    # slotId -> data:image/...;base64,... (or external URL)
+    assets: dict = Field(default_factory=dict)
+    createdAt: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updatedAt: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class ProjectCreate(BaseModel):
+    title: Optional[str] = None
+    concept: Optional[GameConcept] = None
+    playground: Optional[PlaygroundState] = None
+    assets: Optional[dict] = None
+
+
+class ProjectUpdate(BaseModel):
+    title: Optional[str] = None
+    concept: Optional[GameConcept] = None
+    playground: Optional[PlaygroundState] = None
+    assets: Optional[dict] = None
+
+
+class ProjectSummary(BaseModel):
+    id: str
+    title: str
+    theme: str
+    gameType: str
+    tone: str
+    systemsCount: int
+    assetsCount: int
+    createdAt: datetime
+    updatedAt: datetime
+
+
+def _serialize_project(p: Project) -> dict:
+    """Pydantic model -> Mongo doc. Datetimes -> ISO strings, no _id."""
+    doc = p.model_dump()
+    doc["createdAt"] = doc["createdAt"].isoformat()
+    doc["updatedAt"] = doc["updatedAt"].isoformat()
+    return doc
+
+
+def _deserialize_project(doc: dict) -> Project:
+    """Mongo doc -> Pydantic. ISO strings -> datetimes; drop _id."""
+    if not doc:
+        return None  # type: ignore
+    doc = {k: v for k, v in doc.items() if k != "_id"}
+    for f in ("createdAt", "updatedAt"):
+        if isinstance(doc.get(f), str):
+            try:
+                doc[f] = datetime.fromisoformat(doc[f])
+            except ValueError:
+                doc[f] = datetime.now(timezone.utc)
+    return Project(**doc)
+
+
+def _summarize(p: Project) -> ProjectSummary:
+    return ProjectSummary(
+        id=p.id,
+        title=p.title,
+        theme=p.concept.theme,
+        gameType=p.concept.gameType,
+        tone=p.concept.tone,
+        systemsCount=len(p.concept.systems),
+        assetsCount=len(p.assets or {}),
+        createdAt=p.createdAt,
+        updatedAt=p.updatedAt,
+    )
+
+
+DEFAULT_PROJECT_TITLE = "Cursed Muffin Raccoons"
+
+
+def _default_seed_project() -> Project:
+    return Project(
+        title=DEFAULT_PROJECT_TITLE,
+        concept=GameConcept(
+            title=DEFAULT_PROJECT_TITLE,
+            theme="Cozy Bakery",
+            gameType="Absurd / comedy idle",
+            coreFantasy="Run a chaotic but loveable business",
+            mainAction="Bake",
+            progressionStyle="Prestige loops",
+            currencyModel="Soft + Hard + Prestige",
+            systems=["Pets", "Bosses", "Achievements", "Prestige", "Offline earnings"],
+            tone="Wholesome chaos",
+            freeText=(
+                "A cozy absurd idle game where raccoons run a magical bakery, "
+                "automate cursed muffin production, hire woodland helpers, "
+                "battle pastry ghosts, and prestige into Golden Muffins."
+            ),
+        ),
+        playground=PlaygroundState(),
+        assets={},
+    )
+
+
+@app.on_event("startup")
+async def _seed_default_project() -> None:
+    """Idempotent: ensure at least one project exists on first run."""
+    try:
+        count = await db.projects.count_documents({})
+        if count == 0:
+            p = _default_seed_project()
+            await db.projects.insert_one(_serialize_project(p))
+            logger.info("Seeded default project: %s (%s)", p.title, p.id)
+    except Exception:
+        logger.exception("Default project seed failed (continuing)")
+
+
 # Add your routes to the router instead of directly to app
 @api_router.get("/")
 async def root():
@@ -227,6 +367,93 @@ async def generate_asset(req: AssetGenerateRequest):
         "model": model_id,
         "slotId": req.slotId,
     }
+
+
+# ---- Project CRUD ----
+
+@api_router.get("/projects", response_model=List[ProjectSummary])
+async def list_projects():
+    """Return all projects as lightweight summaries (no asset blobs)."""
+    summaries: List[ProjectSummary] = []
+    async for doc in db.projects.find({}).sort("updatedAt", -1):
+        p = _deserialize_project(doc)
+        if p is not None:
+            summaries.append(_summarize(p))
+    return summaries
+
+
+@api_router.get("/projects/{project_id}", response_model=Project)
+async def get_project(project_id: str):
+    doc = await db.projects.find_one({"id": project_id})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return _deserialize_project(doc)
+
+
+@api_router.post("/projects", response_model=Project)
+async def create_project(payload: ProjectCreate):
+    p = Project(
+        title=(payload.title or (payload.concept.title if payload.concept else "Untitled Sketch")),
+        concept=payload.concept or GameConcept(title=payload.title or "Untitled Sketch"),
+        playground=payload.playground or PlaygroundState(),
+        assets=payload.assets or {},
+    )
+    await db.projects.insert_one(_serialize_project(p))
+    logger.info("Created project %s (%s)", p.title, p.id)
+    return p
+
+
+@api_router.put("/projects/{project_id}", response_model=Project)
+async def update_project(project_id: str, payload: ProjectUpdate):
+    existing = await db.projects.find_one({"id": project_id})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Project not found")
+    p = _deserialize_project(existing)
+    if payload.concept is not None:
+        p.concept = payload.concept
+    if payload.title is not None:
+        p.title = payload.title
+        p.concept.title = payload.title
+    if payload.playground is not None:
+        p.playground = payload.playground
+    if payload.assets is not None:
+        p.assets = payload.assets
+    p.updatedAt = datetime.now(timezone.utc)
+    await db.projects.update_one({"id": project_id}, {"$set": _serialize_project(p)})
+    return p
+
+
+@api_router.delete("/projects/{project_id}")
+async def delete_project(project_id: str):
+    res = await db.projects.delete_one({"id": project_id})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Project not found")
+    # Ensure we never end up with an empty workspace
+    count = await db.projects.count_documents({})
+    if count == 0:
+        seed = _default_seed_project()
+        await db.projects.insert_one(_serialize_project(seed))
+        logger.info("Reseeded default after delete: %s", seed.id)
+    return {"ok": True, "id": project_id}
+
+
+@api_router.post("/projects/{project_id}/duplicate", response_model=Project)
+async def duplicate_project(project_id: str):
+    existing = await db.projects.find_one({"id": project_id})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Project not found")
+    src = _deserialize_project(existing)
+    now = datetime.now(timezone.utc)
+    copy = Project(
+        title=f"{src.title} (copy)",
+        concept=GameConcept(**{**src.concept.model_dump(), "title": f"{src.concept.title} (copy)"}),
+        playground=src.playground,
+        assets=dict(src.assets or {}),
+        createdAt=now,
+        updatedAt=now,
+    )
+    await db.projects.insert_one(_serialize_project(copy))
+    return copy
 
 # Include the router in the main app
 app.include_router(api_router)

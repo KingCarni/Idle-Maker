@@ -4,8 +4,10 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useReducer,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -27,6 +29,7 @@ import type {
   Upgrade,
 } from '@/lib/types';
 import { TAB_KEYS, type TabKey } from '@/components/NotebookTabs';
+import { ProjectAPI, type Project, type ProjectSummary } from '@/lib/api';
 
 interface AppState {
   activeTab: TabKey;
@@ -49,6 +52,14 @@ interface AppState {
   generating: Record<string, boolean>;
   // last-error per slot for friendly UI feedback
   assetErrors: Record<string, string>;
+  // Project / persistence
+  projectId: string | null;
+  projects: ProjectSummary[];
+  saveState: 'idle' | 'dirty' | 'saving' | 'saved' | 'error';
+  saveError: string | null;
+  lastSavedAt: number | null;
+  projectModalOpen: boolean;
+  loadingProject: boolean;
 }
 
 type Action =
@@ -67,19 +78,30 @@ type Action =
   | { type: 'assetStart'; slotId: string }
   | { type: 'assetDone'; slotId: string; image: string }
   | { type: 'assetError'; slotId: string; error: string }
-  | { type: 'assetClear'; slotId: string };
+  | { type: 'assetClear'; slotId: string }
+  | { type: 'setProjects'; projects: ProjectSummary[] }
+  | { type: 'loadProject'; project: Project }
+  | { type: 'setSaveState'; saveState: AppState['saveState']; error?: string | null; lastSavedAt?: number | null }
+  | { type: 'markDirty' }
+  | { type: 'setProjectModal'; open: boolean }
+  | { type: 'setLoadingProject'; loading: boolean };
 
 function reducer(state: AppState, action: Action): AppState {
+  // Marks the project dirty if it represents user-driven state changes that we persist.
+  const dirty = (next: AppState): AppState => ({
+    ...next,
+    saveState: state.loadingProject ? next.saveState : 'dirty',
+  });
   switch (action.type) {
     case 'setTab':
       return { ...state, activeTab: action.tab };
     case 'updateConcept':
-      return { ...state, concept: { ...state.concept, ...action.patch } };
+      return dirty({ ...state, concept: { ...state.concept, ...action.patch } });
     case 'toggleSystem': {
       const s = state.concept.systems.includes(action.system)
         ? state.concept.systems.filter((x) => x !== action.system)
         : [...state.concept.systems, action.system];
-      return { ...state, concept: { ...state.concept, systems: s } };
+      return dirty({ ...state, concept: { ...state.concept, systems: s } });
     }
     case 'addImport':
       return { ...state, imports: [action.file, ...state.imports] };
@@ -90,16 +112,16 @@ function reducer(state: AppState, action: Action): AppState {
     case 'setCompanionOpen':
       return { ...state, companionOpen: action.open };
     case 'tapCrumbs':
-      return { ...state, pgCrumbs: state.pgCrumbs + (action.amount ?? 1) };
+      return dirty({ ...state, pgCrumbs: state.pgCrumbs + (action.amount ?? 1) });
     case 'buyRaccoon': {
       const cost = Math.floor(15 * Math.pow(1.15, state.pgRaccoons));
       if (state.pgCrumbs < cost) return state;
-      return {
+      return dirty({
         ...state,
         pgCrumbs: state.pgCrumbs - cost,
         pgRaccoons: state.pgRaccoons + 1,
         pgPerSec: +(state.pgPerSec + 1.2).toFixed(2),
-      };
+      });
     }
     case 'buyUpgrade': {
       if (state.ownedUpgrades.includes(action.id)) return state;
@@ -114,26 +136,24 @@ function reducer(state: AppState, action: Action): AppState {
       if (up.id === 'whisk') perSec = +(perSec + state.pgRaccoons * 1.2).toFixed(2);
       if (up.id === 'double-baked') perSec = +(perSec * 2).toFixed(2);
       if (up.id === 'multiplier') perSec = +(perSec * 1.5).toFixed(2);
-      return {
+      return dirty({
         ...state,
         pgCrumbs: crumbs,
         pgPerSec: perSec,
         ownedUpgrades: [...state.ownedUpgrades, action.id],
-      };
+      });
     }
     case 'prestige':
-      return {
+      return dirty({
         ...state,
         pgCrumbs: 0,
         pgRaccoons: 0,
         pgPerSec: 0,
         ownedUpgrades: [],
-      };
+      });
     case 'tick':
-      return {
-        ...state,
-        pgCrumbs: state.pgCrumbs + state.pgPerSec / 5, // 200ms tick
-      };
+      // Tick changes pgCrumbs continuously; don't spam save state.
+      return { ...state, pgCrumbs: state.pgCrumbs + state.pgPerSec / 5 };
     case 'assetStart':
       return {
         ...state,
@@ -142,12 +162,12 @@ function reducer(state: AppState, action: Action): AppState {
       };
     case 'assetDone': {
       const { [action.slotId]: _gone, ...restGen } = state.generating;
-      return {
+      return dirty({
         ...state,
         generating: restGen,
         assets: { ...state.assets, [action.slotId]: action.image },
         assetErrors: { ...state.assetErrors, [action.slotId]: '' },
-      };
+      });
     }
     case 'assetError': {
       const { [action.slotId]: _gone, ...restGen } = state.generating;
@@ -160,8 +180,41 @@ function reducer(state: AppState, action: Action): AppState {
     case 'assetClear': {
       const { [action.slotId]: _gone, ...restAssets } = state.assets;
       const { [action.slotId]: _err, ...restErr } = state.assetErrors;
-      return { ...state, assets: restAssets, assetErrors: restErr };
+      return dirty({ ...state, assets: restAssets, assetErrors: restErr });
     }
+    case 'setProjects':
+      return { ...state, projects: action.projects };
+    case 'loadProject': {
+      const p = action.project;
+      return {
+        ...state,
+        projectId: p.id,
+        concept: { ...SAMPLE_CONCEPT, ...p.concept },
+        pgCrumbs: p.playground?.pgCrumbs ?? 0,
+        pgRaccoons: p.playground?.pgRaccoons ?? 0,
+        pgPerSec: p.playground?.pgPerSec ?? 0,
+        ownedUpgrades: p.playground?.ownedUpgrades ?? [],
+        assets: p.assets || {},
+        assetErrors: {},
+        generating: {},
+        saveState: 'saved',
+        saveError: null,
+        lastSavedAt: Date.now(),
+      };
+    }
+    case 'setSaveState':
+      return {
+        ...state,
+        saveState: action.saveState,
+        saveError: action.error ?? null,
+        lastSavedAt: action.lastSavedAt ?? state.lastSavedAt,
+      };
+    case 'markDirty':
+      return { ...state, saveState: 'dirty' };
+    case 'setProjectModal':
+      return { ...state, projectModalOpen: action.open };
+    case 'setLoadingProject':
+      return { ...state, loadingProject: action.loading };
     default:
       return state;
   }
@@ -184,6 +237,13 @@ const initial: AppState = {
   assets: {},
   generating: {},
   assetErrors: {},
+  projectId: null,
+  projects: [],
+  saveState: 'idle',
+  saveError: null,
+  lastSavedAt: null,
+  projectModalOpen: false,
+  loadingProject: false,
 };
 
 interface AppContextValue extends AppState {
@@ -203,6 +263,15 @@ interface AppContextValue extends AppState {
   prev: () => void;
   generateAsset: (slotId: string, label: string, prompt: string) => Promise<void>;
   clearAsset: (slotId: string) => void;
+  // Project / persistence
+  refreshProjects: () => Promise<void>;
+  openProject: (id: string) => Promise<void>;
+  newProject: (title?: string) => Promise<void>;
+  duplicateProject: (id: string) => Promise<void>;
+  deleteProject: (id: string) => Promise<void>;
+  renameProject: (title: string) => void;
+  saveNow: () => Promise<void>;
+  setProjectModalOpen: (open: boolean) => void;
 }
 
 const Ctx = createContext<AppContextValue | null>(null);
@@ -281,6 +350,162 @@ export function AppProvider({ children }: { children: ReactNode }) {
     []
   );
 
+  // ---- Projects ----
+
+  const refreshProjects = useCallback(async () => {
+    try {
+      const list = await ProjectAPI.list();
+      dispatch({ type: 'setProjects', projects: list });
+    } catch (e) {
+      // Non-fatal: keep prior list
+      console.warn('Failed to refresh projects', e);
+    }
+  }, []);
+
+  const openProject = useCallback(async (id: string) => {
+    dispatch({ type: 'setLoadingProject', loading: true });
+    try {
+      const p = await ProjectAPI.get(id);
+      dispatch({ type: 'loadProject', project: p });
+    } catch (e: any) {
+      dispatch({ type: 'setSaveState', saveState: 'error', error: e?.message || 'Load failed' });
+    } finally {
+      dispatch({ type: 'setLoadingProject', loading: false });
+    }
+  }, []);
+
+  const newProject = useCallback(async (title?: string) => {
+    dispatch({ type: 'setLoadingProject', loading: true });
+    try {
+      const created = await ProjectAPI.create({
+        title: title || 'Untitled Sketch',
+        concept: {
+          ...SAMPLE_CONCEPT,
+          title: title || 'Untitled Sketch',
+          theme: 'Cozy Bakery',
+          systems: [],
+          freeText: '',
+        },
+      } as any);
+      dispatch({ type: 'loadProject', project: created });
+      await refreshProjects();
+    } catch (e: any) {
+      dispatch({ type: 'setSaveState', saveState: 'error', error: e?.message || 'Create failed' });
+    } finally {
+      dispatch({ type: 'setLoadingProject', loading: false });
+    }
+  }, [refreshProjects]);
+
+  const duplicateProject = useCallback(async (id: string) => {
+    try {
+      const copy = await ProjectAPI.duplicate(id);
+      await refreshProjects();
+      dispatch({ type: 'loadProject', project: copy });
+    } catch (e: any) {
+      dispatch({ type: 'setSaveState', saveState: 'error', error: e?.message || 'Duplicate failed' });
+    }
+  }, [refreshProjects]);
+
+  const deleteProject = useCallback(async (id: string) => {
+    try {
+      await ProjectAPI.remove(id);
+      await refreshProjects();
+      // If we deleted the current project, load the most recently updated one.
+      if (state.projectId === id) {
+        const list = await ProjectAPI.list();
+        if (list.length > 0) {
+          await openProject(list[0].id);
+        } else {
+          // The backend reseeds when empty — pick whatever it created.
+          const list2 = await ProjectAPI.list();
+          if (list2.length > 0) await openProject(list2[0].id);
+        }
+      }
+    } catch (e: any) {
+      dispatch({ type: 'setSaveState', saveState: 'error', error: e?.message || 'Delete failed' });
+    }
+  }, [refreshProjects, openProject, state.projectId]);
+
+  const renameProject = useCallback((title: string) => {
+    dispatch({ type: 'updateConcept', patch: { title } });
+  }, []);
+
+  // Build the payload for save/persist.
+  const buildPayload = useCallback(
+    (s: AppState) => ({
+      title: s.concept.title,
+      concept: s.concept,
+      playground: {
+        pgCrumbs: s.pgCrumbs,
+        pgRaccoons: s.pgRaccoons,
+        pgPerSec: s.pgPerSec,
+        ownedUpgrades: s.ownedUpgrades,
+      },
+      assets: s.assets,
+    }),
+    []
+  );
+
+  // Latest-state ref so the debounced timer always reads current values.
+  const stateRef = useRef(state);
+  stateRef.current = state;
+
+  const saveNow = useCallback(async () => {
+    const s = stateRef.current;
+    if (!s.projectId) return;
+    dispatch({ type: 'setSaveState', saveState: 'saving' });
+    try {
+      await ProjectAPI.update(s.projectId, buildPayload(s) as any);
+      dispatch({
+        type: 'setSaveState',
+        saveState: 'saved',
+        lastSavedAt: Date.now(),
+        error: null,
+      });
+      // Refresh list so the sidebar/modal reflects the new updatedAt order
+      refreshProjects();
+    } catch (e: any) {
+      dispatch({
+        type: 'setSaveState',
+        saveState: 'error',
+        error: e?.message || 'Save failed',
+      });
+    }
+  }, [buildPayload, refreshProjects]);
+
+  const setProjectModalOpen = useCallback(
+    (open: boolean) => dispatch({ type: 'setProjectModal', open }),
+    []
+  );
+
+  // Bootstrap: load project list + open the most recent one.
+  const bootstrapped = useRef(false);
+  useEffect(() => {
+    if (bootstrapped.current) return;
+    bootstrapped.current = true;
+    (async () => {
+      try {
+        const list = await ProjectAPI.list();
+        dispatch({ type: 'setProjects', projects: list });
+        if (list.length > 0) {
+          await openProject(list[0].id);
+        }
+      } catch (e) {
+        console.warn('Project bootstrap failed', e);
+      }
+    })();
+  }, [openProject]);
+
+  // Auto-save: debounce dirty state for 800ms.
+  useEffect(() => {
+    if (state.saveState !== 'dirty') return;
+    if (!state.projectId) return;
+    const t = window.setTimeout(() => {
+      saveNow();
+    }, 800);
+    return () => window.clearTimeout(t);
+  }, [state.saveState, state.projectId, saveNow]);
+
   const value = useMemo<AppContextValue>(
     () => ({
       ...state,
@@ -300,8 +525,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
       prev,
       generateAsset,
       clearAsset,
+      refreshProjects,
+      openProject,
+      newProject,
+      duplicateProject,
+      deleteProject,
+      renameProject,
+      saveNow,
+      setProjectModalOpen,
     }),
-    [state, setTab, updateConcept, toggleSystem, addImport, removeImport, addMessage, setCompanionOpen, tap, buyRaccoon, buyUpgrade, prestige, raccoonCost, next, prev, generateAsset, clearAsset]
+    [state, setTab, updateConcept, toggleSystem, addImport, removeImport, addMessage, setCompanionOpen, tap, buyRaccoon, buyUpgrade, prestige, raccoonCost, next, prev, generateAsset, clearAsset, refreshProjects, openProject, newProject, duplicateProject, deleteProject, renameProject, saveNow, setProjectModalOpen]
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
@@ -314,7 +547,6 @@ export function useApp() {
 }
 
 // Internal: tick helper
-import { useEffect } from 'react';
 function useTick(fn: () => void, active: boolean) {
   useEffect(() => {
     if (!active) return;

@@ -15,7 +15,7 @@ const KIND_ICON = {
 } as const;
 
 export default function ProjectTray() {
-  const { imports, addImport, removeImport, concept } = useApp();
+  const { imports, addImport, removeImport, concept, setProjectModalOpen, projects, saveState } = useApp();
   const [previewId, setPreviewId] = useState<string | null>(null);
 
   return (
@@ -26,8 +26,18 @@ export default function ProjectTray() {
     >
       <CornerClip className="absolute -top-2 left-6 z-10" />
       <div className="p-5 border-b-2 border-dashed border-softBorder">
-        <p className="text-xs uppercase tracking-[0.2em] text-pencil font-nunito">Project Tray</p>
-        <h2 className="font-fraunces text-2xl text-ink leading-tight">
+        <div className="flex items-center justify-between">
+          <p className="text-xs uppercase tracking-[0.2em] text-pencil font-nunito">Project Tray</p>
+          <button
+            type="button"
+            onClick={() => setProjectModalOpen(true)}
+            data-testid="tray-open-projects"
+            className="text-[10px] font-bold font-nunito uppercase tracking-widest border-2 border-ink rounded-full px-2 py-0.5 bg-card hover:bg-honey/40"
+          >
+            {projects.length} project{projects.length === 1 ? '' : 's'}
+          </button>
+        </div>
+        <h2 className="font-fraunces text-2xl text-ink leading-tight" data-testid="tray-project-title">
           {concept.title}
         </h2>
         <p className="font-caveat text-base text-pencil mt-1">
