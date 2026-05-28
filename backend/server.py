@@ -40,7 +40,57 @@ class StatusCheckCreate(BaseModel):
 # Add your routes to the router instead of directly to app
 @api_router.get("/")
 async def root():
-    return {"message": "Hello World"}
+    return {"message": "Idle Maker API — Sketchbook Studio"}
+
+
+@api_router.get("/health")
+async def health():
+    return {"status": "ok", "service": "idle-maker"}
+
+
+@api_router.get("/mock-data")
+async def mock_data():
+    """Returns the sample 'Cursed Muffin Raccoons' mock game so the frontend
+    can later toggle between local and server-backed data."""
+    return {
+        "concept": {
+            "title": "Cursed Muffin Raccoons",
+            "theme": "Cozy Bakery",
+            "gameType": "Absurd / comedy idle",
+            "coreFantasy": "Run a chaotic but loveable business",
+            "mainAction": "Bake",
+            "progressionStyle": "Prestige loops",
+            "currencyModel": "Soft + Hard + Prestige",
+            "systems": ["Pets", "Bosses", "Achievements", "Prestige", "Offline earnings"],
+            "tone": "Wholesome chaos",
+            "freeText": (
+                "A cozy absurd idle game where raccoons run a magical bakery, "
+                "automate cursed muffin production, hire woodland helpers, "
+                "battle pastry ghosts, and prestige into Golden Muffins."
+            ),
+        },
+        "currencies": [
+            {"id": "crumbs", "name": "Crumbs", "symbol": "◍", "tier": "soft"},
+            {"id": "sugar-stars", "name": "Sugar Stars", "symbol": "✦", "tier": "hard"},
+            {"id": "golden-muffins", "name": "Golden Muffins", "symbol": "✺", "tier": "prestige"},
+        ],
+        "generators": [
+            {"id": "raccoon-baker", "name": "Raccoon Baker", "baseCost": 15, "rate": 1.2},
+            {"id": "haunted-oven", "name": "Haunted Oven", "baseCost": 220, "rate": 9.0},
+            {"id": "sprinkle-mixer", "name": "Sprinkle Mixer", "baseCost": 5, "rate": 0.4},
+            {"id": "moonlit-cart", "name": "Moonlit Delivery Cart", "baseCost": 3400, "rate": 110.0},
+            {"id": "elderberry-book", "name": "Elderberry Recipe Book", "baseCost": 80, "rate": 2.5},
+        ],
+        "exportPlan": [
+            {"id": "design-doc", "title": "Design Doc", "status": "Mock only"},
+            {"id": "json-config", "title": "JSON Config", "status": "Ready later"},
+            {"id": "browser-proto", "title": "Browser Prototype", "status": "Mock only"},
+            {"id": "godot", "title": "Godot Starter", "status": "Planned"},
+            {"id": "unity", "title": "Unity Starter", "status": "Planned"},
+            {"id": "unreal", "title": "Unreal Research", "status": "Planned"},
+            {"id": "asset-pack", "title": "Asset Pack", "status": "Mock only"},
+        ],
+    }
 
 @api_router.post("/status", response_model=StatusCheck)
 async def create_status_check(input: StatusCheckCreate):

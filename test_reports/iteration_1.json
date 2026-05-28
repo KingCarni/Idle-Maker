@@ -1,0 +1,38 @@
+{
+  "summary": "Full e2e testing of Idle Maker MVP (Next.js + thin FastAPI). Backend: 8/8 pytest passing (health, mock-data structure, status CRUD persistence). Frontend: all 9 sections render with required data-testids, NotebookTabs switch + active state work, footer prev/next disabled correctly at ends, ProjectTray title syncs from idea-title, playground tap/buy-raccoon/persec/upgrade/prestige flow works, Companion drawer trigger/prompts/send/close work, ImportDropzone classifies JSON/MD/PNG and shows import-warning for .txt, custom-cursor-root exists. No critical bugs found.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "global", "issues": ["Next.js dev-mode console warnings about font woff2 preloads not being used within a few seconds (cosmetic — harmless Next.js dev warning, would not appear in production build)"]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_idle_maker_api.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "AppShell SectionRouter only renders the active section (good for perf) — state in non-mounted sections is preserved via reducer so this is fine.",
+    "ImportDropzone correctly classifies by extension AND mime; invalid placeholder is kept which is nice UX.",
+    "backend /api/status persists timestamp as ISO string and converts back on read — clean. _id is excluded from query results.",
+    "Reducer in AppContext.tsx is clean and testable; buyRaccoon uses geometric cost scaling (15 * 1.15^n) which is standard idle-game math.",
+    "Minor: useTick uses 200ms interval which divides pg-persec by 5 per tick — semantically correct but a comment '// 200ms tick' is the only doc; consider a named constant.",
+    "CORS allow_origins reads from CORS_ORIGINS env (currently '*'). For production, recommend tightening."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_idle_maker_api.py",
+    "/app/backend/tests/__init__.py"
+  ],
+  "success_rate": {"backend": "100% (8/8)", "frontend": "100% on isolated re-test (all 9 sections + companion + tray + dropzone + playground + footer)"},
+  "test_credentials": "none required (no auth)",
+  "seed_data_creation": "Backend test created one TEST_idle_maker_agent status check in MongoDB during persistence test (acceptable test data).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "First playwright run had cascading timing failures after a rapid tab-cycle test, but a fresh isolated rerun of each section confirmed all sections render correctly. Use isolated section tests rather than long sequential flows for reliable runs. Backend pytest at /app/backend/tests/test_idle_maker_api.py is the canonical regression suite. App is fully client-side state — no auth, no real AI; companion is canned. The playground cost for first raccoon is exactly 15 crumbs (geometric scaling 15*1.15^n thereafter). Prestige fully resets pgCrumbs/pgRaccoons/pgPerSec/ownedUpgrades. Note that asset-generate-* buttons exist and were verified; their click handlers are placeholders (mocked).",
+  "rca_of_issues": "No real issues found. Initial Playwright run reported 7 failures (idea/loop/economy/upgrades/creatures/assets/playground), but root cause was test-script timing — running many click+screenshot+upload actions back-to-back in one long script caused Next.js client navigation transitions and React state updates to fall behind Playwright's selector polling. A clean isolated re-test with proper waits after each tab switch passed 100%. All required data-testids exist and behave per spec."
+}
